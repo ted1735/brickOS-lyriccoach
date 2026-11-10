@@ -347,6 +347,10 @@
         <button id="mobileSidebarToggle" onclick="toggleMobileSidebar()" title="Toggle Song Brief">☰</button>
         <span class="brand-tag">brickOS</span>
         <span class="brand-title">Lyric Coach</span>
+        <span id="syncIndicator" style="display:inline-flex; align-items:center; gap:4px; font-size:0.7rem; color:var(--success); font-weight:600; margin-left:6px; opacity:0; transition:opacity 0.3s ease;">
+          <span style="width:6px; height:6px; background:var(--success); border-radius:50%; display:inline-block;"></span>
+          <span id="syncText">Saved</span>
+        </span>
       </div>
       <div class="header-center">
         <button id="btnSoloMode" class="mode-tab active" onclick="setMode('solo')">Solo Editor</button>
@@ -659,6 +663,7 @@
       if (idx === '' || !TRACKS_LIBRARY[idx]) return;
 
       const track = TRACKS_LIBRARY[idx];
+      project.meta.trackId = track.id;
       document.getElementById('songTitle').value = track.title || 'Untitled Track';
 
       // Genre: Support dynamic genres if not in default options
@@ -852,6 +857,7 @@
           saveActiveVersionText();
           updateLineAnalysis(row, input.value, index);
           runLiveAudit();
+          triggerAutoSave();
         });
 
         input.addEventListener('keydown', (e) => {
@@ -926,6 +932,7 @@
       alert(`Version ${current + 1} finalized! Compliance Score: ${audit.auditScore}/100. Moving to Version ${next + 1}.`);
       switchVersion(next);
       setMode('matrix');
+      triggerAutoSave();
     };
 
     // Render 3-Way Comparison Matrix
@@ -1027,6 +1034,81 @@
       alert('Block copied to clipboard!');
     };
 
+    // Auto-Save Engine (LocalStorage + Remote brickOS SQLite Sync)
+    let autoSaveTimer = null;
+
+    function triggerAutoSave() {
+      // 1. Instant local persistence to localStorage
+      try {
+        localStorage.setItem('brickos_lyric_project', JSON.stringify(project));
+      } catch (err) {
+        console.warn('LocalStorage save error:', err);
+      }
+
+      // 2. Visual saving indicator
+      const ind = document.getElementById('syncIndicator');
+      const txt = document.getElementById('syncText');
+      if (ind && txt) {
+        ind.style.opacity = '1';
+        txt.textContent = 'Saving...';
+      }
+
+      // 3. Debounced remote sync to /api.php (brickos.db on CT 120)
+      if (autoSaveTimer) clearTimeout(autoSaveTimer);
+      autoSaveTimer = setTimeout(async () => {
+        await syncToBrickOSDatabase();
+      }, 800);
+    }
+
+    async function syncToBrickOSDatabase() {
+      const ind = document.getElementById('syncIndicator');
+      const txt = document.getElementById('syncText');
+
+      if (!project.meta.trackId) {
+        // If not loaded from DB yet, still mark local save complete
+        if (ind && txt) {
+          txt.textContent = 'Saved Locally';
+          setTimeout(() => { ind.style.opacity = '0'; }, 1500);
+        }
+        return;
+      }
+
+      try {
+        const payload = {
+          track_id: project.meta.trackId,
+          title: project.meta.title,
+          genre: project.meta.genre,
+          bpm: project.meta.bpm,
+          ep_id: project.meta.epMandate ? project.meta.epMandate.slice(0, 4) : null,
+          vocal_archetype: project.meta.vocalArchetype,
+          lyrics: project.versions[0].text || '',
+          version_slot: project.activeVersion
+        };
+
+        const res = await fetch('/api.php?action=save_track', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        });
+
+        if (res.ok) {
+          const respData = await res.json();
+          if (ind && txt) {
+            txt.textContent = 'Synced to brickOS DB';
+            setTimeout(() => { ind.style.opacity = '0'; }, 2000);
+          }
+        } else {
+          throw new Error('Server returned ' + res.status);
+        }
+      } catch (err) {
+        console.warn('Remote sync failed (saved to browser cache):', err);
+        if (ind && txt) {
+          txt.textContent = 'Saved Locally';
+          setTimeout(() => { ind.style.opacity = '0'; }, 1500);
+        }
+      }
+    }
+
     window.updateSongMeta = function() {
       project.meta.title = document.getElementById('songTitle').value;
       project.meta.genre = document.getElementById('songGenre').value;
@@ -1034,6 +1116,7 @@
       project.meta.epMandate = document.getElementById('epMandate').value;
       project.meta.vocalArchetype = document.getElementById('vocalArchetype').value;
       runLiveAudit();
+      triggerAutoSave();
     };
 
     function initWorkbench() {
