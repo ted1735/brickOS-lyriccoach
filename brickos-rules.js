@@ -97,7 +97,7 @@ export function auditLyrics(lyrics, meta = {}) {
   score = Math.max(20, Math.min(100, score));
 
   // 5. Suno 4-Block Generation
-  const archetype = meta.vocal_archetype || "Brandon";
+  const archetype = meta.vocalArchetype || meta.vocal_archetype || "Brandon";
   const cleanTitle = (meta.title || "UntitledSong").replace(/\s+/g, '');
   const bmvTitle = `${cleanTitle}_${archetype.split(' ')[0]}_v1_BMV1`;
 

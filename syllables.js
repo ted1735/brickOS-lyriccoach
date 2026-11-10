@@ -20,7 +20,12 @@ export function countSyllables(word) {
   if (specialWords[w]) return specialWords[w];
 
   // Common prefix / suffix rules
-  w = w.replace(/(?:[^laeiouy]|ed|es|e)$/, '');
+  // Handle consonant + le words (table, people, battle, candle, simple)
+  if (!/[^aeiouy]le$/i.test(w)) {
+    w = w.replace(/(?:[^laeiouy]|ed|es|e)$/, '');
+  } else {
+    w = w.replace(/(?:ed|es)$/, '');
+  }
   w = w.replace(/^y/, '');
 
   const matches = w.match(/[aeiouy]{1,2}/g);
@@ -61,6 +66,7 @@ export function getRhymeEnding(word) {
     [/ier$/, 'eer'],
     [/air$/, 'air'],
     [/are$/, 'air'],
+    [/ere$/, 'air'],
     [/oo$/, 'oo'],
     [/ue$/, 'oo'],
     [/ew$/, 'oo'],
@@ -76,6 +82,10 @@ export function getRhymeEnding(word) {
   for (const [pattern, phonetic] of soundRules) {
     if (pattern.test(clean)) return phonetic;
   }
+
+  // Handle vowel-consonant-e (e.g. make -> ake, time -> ime, stone -> one, grave -> ave)
+  const vceMatch = clean.match(/([aeiouy][^aeiouy]+)e$/);
+  if (vceMatch) return vceMatch[1];
 
   // Fallback: extract last vowel group + tail consonants
   const match = clean.match(/[aeiouy]+[^aeiouy]*$/);

@@ -416,6 +416,7 @@
               <option value="Neon Gospel">Neon Gospel (Boss Energy Alto / Pop Shimmer)</option>
               <option value="Monica">Monica (Crossover Anchor / Trap Gritty)</option>
               <option value="Ms T">Ms T (Gospel Foundation / B3 Power)</option>
+              <option value="Silas Thorne">Silas Thorne (Blue-Collar CHH / Gritty)</option>
             </select>
           </div>
         </div>
@@ -659,16 +660,77 @@
 
       const track = TRACKS_LIBRARY[idx];
       document.getElementById('songTitle').value = track.title || 'Untitled Track';
-      if (track.genre) document.getElementById('songGenre').value = track.genre;
+
+      // Genre: Support dynamic genres if not in default options
+      if (track.genre) {
+        const genreSelect = document.getElementById('songGenre');
+        let matched = false;
+        for (let i = 0; i < genreSelect.options.length; i++) {
+          if (genreSelect.options[i].value.toLowerCase() === track.genre.toLowerCase()) {
+            genreSelect.selectedIndex = i;
+            matched = true;
+            break;
+          }
+        }
+        if (!matched) {
+          const customOpt = new Option(track.genre, track.genre, true, true);
+          genreSelect.add(customOpt);
+        }
+      }
+
       if (track.bpm) document.getElementById('songBpm').value = track.bpm;
-      if (track.vocal_archetype) document.getElementById('vocalArchetype').value = track.vocal_archetype.split(' ')[0];
+
+      // EP Mandate sync
+      if (track.ep_id) {
+        const epMap = {
+          'EP-01': 'EP 1: Restoration',
+          'EP-02': 'EP 2: Conflict Suite',
+          'EP-03': 'EP 3: War Room Anthems',
+          'EP-04': 'EP 4: Surrender Sessions'
+        };
+        const epVal = epMap[track.ep_id] || track.ep_id;
+        const epSelect = document.getElementById('epMandate');
+        for (let i = 0; i < epSelect.options.length; i++) {
+          if (epSelect.options[i].value.startsWith(epVal.slice(0, 4))) {
+            epSelect.selectedIndex = i;
+            break;
+          }
+        }
+      }
+
+      // Vocal Archetype matching
+      if (track.vocal_archetype) {
+        const vaSelect = document.getElementById('vocalArchetype');
+        const rawVA = track.vocal_archetype.toLowerCase();
+        let matched = false;
+        for (let i = 0; i < vaSelect.options.length; i++) {
+          const optVal = vaSelect.options[i].value.toLowerCase();
+          if (rawVA.includes(optVal) || optVal.includes(rawVA)) {
+            vaSelect.selectedIndex = i;
+            matched = true;
+            break;
+          }
+        }
+        if (!matched) {
+          const customVA = new Option(track.vocal_archetype, track.vocal_archetype, true, true);
+          vaSelect.add(customVA);
+        }
+      }
+
+      // Normalize markdown escaped section headers \\[Section\\] -> [Section]
+      let cleanLyrics = (track.lyrics || '')
+        .replace(/\\\[/g, '[')
+        .replace(/\\\]/g, ']')
+        .replace(/^#+\s*\*\*[^*]+\*\*\s*\n*/gm, '');
 
       // Load lyrics into Version 1
-      project.versions[0].text = track.lyrics || '';
+      project.versions[0].text = cleanLyrics;
       
       // If version records exist, populate V2 / V3
       if (track.versions && track.versions.length > 1) {
-        project.versions[1].text = track.versions[1].lyrics || track.lyrics;
+        project.versions[1].text = (track.versions[1].lyrics || track.lyrics || '')
+          .replace(/\\\[/g, '[')
+          .replace(/\\\]/g, ']');
       } else {
         project.versions[1].text = '';
       }
