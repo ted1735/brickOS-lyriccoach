@@ -720,8 +720,13 @@
       // Normalize markdown escaped section headers \\[Section\\] -> [Section]
       let cleanLyrics = (track.lyrics || '')
         .replace(/\\\[/g, '[')
-        .replace(/\\\]/g, ']')
-        .replace(/^#+\s*\*\*[^*]+\*\*\s*\n*/gm, '');
+        .replace(/\\\]/g, ']');
+
+      // Clean up markdown noise
+      cleanLyrics = cleanLyrics
+        .replace(/^#+\s*\*\*.*?\*\*\s*$/gm, '')
+        .replace(/^#+\s+.*?$/gm, '')
+        .trim();
 
       // Load lyrics into Version 1
       project.versions[0].text = cleanLyrics;
@@ -737,7 +742,7 @@
       project.versions[2].text = '';
 
       updateSongMeta();
-      switchVersion(0);
+      switchVersion(0, false);
 
       // Close mobile drawer if open
       const sb = document.getElementById('mainSidebar');
@@ -795,8 +800,8 @@
     };
 
     // Version Switching
-    window.switchVersion = function(idx) {
-      saveActiveVersionText();
+    window.switchVersion = function(idx, shouldSave = true) {
+      if (shouldSave) saveActiveVersionText();
       project.activeVersion = idx;
       for (let i = 0; i < 3; i++) {
         document.getElementById(`vTab${i}`).classList.toggle('active', i === idx);
