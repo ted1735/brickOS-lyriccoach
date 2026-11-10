@@ -1,0 +1,781 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>brickOS Songwriter & Lyric Coach</title>
+  <style>
+    :root {
+      --bg: #0b0d13;
+      --panel: #131722;
+      --card: #1c2233;
+      --border: #283046;
+      --accent: #6366f1;
+      --accent-hover: #4f46e5;
+      --accent-glow: rgba(99, 102, 241, 0.25);
+      --text: #f1f5f9;
+      --text-muted: #94a3b8;
+      --success: #10b981;
+      --warning: #f59e0b;
+      --danger: #ef4444;
+      --purple: #8b5cf6;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body, html {
+      width: 100%; height: 100%;
+      background: var(--bg); color: var(--text);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      overflow: hidden;
+    }
+
+    /* Auth Modal */
+    #authOverlay {
+      position: fixed; inset: 0;
+      background: radial-gradient(circle at center, #1b2133 0%, #07090f 100%);
+      display: flex; align-items: center; justify-content: center;
+      z-index: 999999;
+      transition: opacity 0.3s ease;
+    }
+    .auth-box {
+      background: var(--panel); border: 1px solid var(--border);
+      border-radius: 14px; padding: 2.5rem; width: 100%; max-width: 420px;
+      box-shadow: 0 25px 50px rgba(0,0,0,0.8); text-align: center;
+    }
+    .auth-badge {
+      display: inline-block; padding: 4px 10px; background: rgba(99, 102, 241, 0.15);
+      color: var(--accent); border-radius: 999px; font-size: 0.75rem; font-weight: 700;
+      letter-spacing: 1px; margin-bottom: 0.75rem;
+    }
+    .auth-title { font-size: 1.6rem; font-weight: 800; margin-bottom: 0.4rem; color: #fff; }
+    .auth-subtitle { font-size: 0.85rem; color: var(--text-muted); margin-bottom: 1.8rem; }
+    .auth-input {
+      width: 100%; padding: 0.8rem 1rem; background: #0c0e14;
+      border: 1px solid var(--border); border-radius: 8px; color: #fff;
+      font-size: 1rem; outline: none; margin-bottom: 1.2rem;
+    }
+    .auth-input:focus { border-color: var(--accent); }
+    .auth-btn {
+      width: 100%; padding: 0.85rem; background: var(--accent);
+      color: #fff; border: none; border-radius: 8px; font-weight: 700;
+      cursor: pointer; transition: background 0.2s;
+    }
+    .auth-btn:hover { background: var(--accent-hover); }
+    .auth-error { color: var(--danger); font-size: 0.85rem; margin-top: 0.8rem; display: none; }
+
+    /* Main App Layout */
+    #appRoot {
+      display: flex; flex-direction: column; width: 100%; height: 100%;
+    }
+
+    /* Top Navigation / Status Header */
+    header {
+      height: 52px; background: var(--panel); border-bottom: 1px solid var(--border);
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 0 1.2rem; flex-shrink: 0;
+    }
+    .brand-wrap { display: flex; align-items: center; gap: 0.75rem; }
+    .brand-tag {
+      background: linear-gradient(135deg, #6366f1, #8b5cf6);
+      color: #fff; font-size: 0.75rem; font-weight: 800; padding: 3px 8px; border-radius: 4px;
+    }
+    .brand-title { font-weight: 700; font-size: 1.05rem; letter-spacing: -0.3px; }
+    .header-center { display: flex; align-items: center; gap: 1rem; font-size: 0.85rem; }
+    .mode-tab {
+      background: none; border: 1px solid transparent; color: var(--text-muted);
+      padding: 6px 14px; border-radius: 6px; cursor: pointer; font-size: 0.82rem; font-weight: 600;
+      transition: all 0.2s;
+    }
+    .mode-tab.active {
+      background: var(--card); color: #fff; border-color: var(--border);
+    }
+    .header-actions { display: flex; align-items: center; gap: 0.6rem; }
+    .btn-action {
+      background: var(--card); border: 1px solid var(--border); color: var(--text);
+      padding: 6px 12px; border-radius: 6px; font-size: 0.8rem; font-weight: 600;
+      cursor: pointer; display: flex; align-items: center; gap: 0.4rem; transition: all 0.2s;
+    }
+    .btn-action:hover { background: var(--border); }
+    .btn-primary {
+      background: var(--accent); border-color: var(--accent); color: #fff;
+    }
+    .btn-primary:hover { background: var(--accent-hover); }
+
+    /* Content Area */
+    .workbench-body {
+      flex: 1; display: flex; overflow: hidden;
+    }
+
+    /* Left Sidebar: Song Brief & brickOS SOP */
+    aside.sidebar {
+      width: 320px; background: var(--panel); border-right: 1px solid var(--border);
+      display: flex; flex-direction: column; overflow-y: auto; flex-shrink: 0;
+    }
+    .sidebar-section { padding: 1.2rem; border-bottom: 1px solid var(--border); }
+    .sidebar-title {
+      font-size: 0.75rem; text-transform: uppercase; font-weight: 700;
+      letter-spacing: 0.8px; color: var(--text-muted); margin-bottom: 0.8rem;
+      display: flex; justify-content: space-between; align-items: center;
+    }
+    .form-group { margin-bottom: 0.9rem; }
+    .form-label { display: block; font-size: 0.78rem; font-weight: 600; color: #cbd5e1; margin-bottom: 0.35rem; }
+    .form-input, .form-select {
+      width: 100%; padding: 0.55rem 0.75rem; background: #0c0e14;
+      border: 1px solid var(--border); border-radius: 6px; color: #fff; font-size: 0.85rem;
+      outline: none;
+    }
+    .form-input:focus, .form-select:focus { border-color: var(--accent); }
+
+    /* Audit Score Meter Card */
+    .audit-card {
+      background: var(--card); border: 1px solid var(--border); border-radius: 8px;
+      padding: 1rem; margin-top: 0.5rem;
+    }
+    .score-row { display: flex; align-items: baseline; justify-content: space-between; margin-bottom: 0.5rem; }
+    .score-value { font-size: 1.6rem; font-weight: 800; color: var(--success); }
+    .score-status { font-size: 0.75rem; font-weight: 700; text-transform: uppercase; }
+    .audit-pill {
+      display: inline-flex; align-items: center; gap: 0.4rem; padding: 4px 8px;
+      border-radius: 4px; font-size: 0.72rem; margin-bottom: 0.4rem; width: 100%;
+    }
+    .pill-pass { background: rgba(16, 185, 129, 0.15); color: #34d399; }
+    .pill-warn { background: rgba(245, 158, 11, 0.15); color: #fbbf24; }
+
+    /* Main Lyric Editing / Multi-Version Area */
+    main.editor-area {
+      flex: 1; display: flex; flex-direction: column; overflow: hidden; background: #090a0f;
+    }
+
+    /* Version Tab Strip */
+    .version-strip {
+      height: 42px; background: #0e111a; border-bottom: 1px solid var(--border);
+      display: flex; align-items: center; justify-content: space-between; padding: 0 1rem;
+    }
+    .version-tabs { display: flex; align-items: center; gap: 0.5rem; }
+    .v-tab {
+      padding: 5px 12px; border-radius: 6px; font-size: 0.8rem; font-weight: 600;
+      background: var(--panel); border: 1px solid var(--border); color: var(--text-muted);
+      cursor: pointer; display: flex; align-items: center; gap: 0.4rem;
+    }
+    .v-tab.active { background: var(--accent); border-color: var(--accent); color: #fff; }
+    .v-tab .score-mini {
+      background: rgba(0,0,0,0.3); padding: 1px 6px; border-radius: 4px; font-size: 0.7rem;
+    }
+
+    /* Solo Editor Container */
+    #soloView {
+      flex: 1; display: flex; overflow: hidden;
+    }
+    .editor-pane {
+      flex: 1; display: flex; flex-direction: column; position: relative;
+    }
+    .lyric-lines-container {
+      flex: 1; overflow-y: auto; padding: 1.5rem; font-family: 'SF Mono', Consolas, Menlo, monospace;
+      font-size: 0.95rem; line-height: 1.8;
+    }
+    .lyric-row {
+      display: flex; align-items: center; gap: 1rem; margin-bottom: 0.2rem;
+    }
+    .gutter-syllables {
+      width: 44px; text-align: center; font-size: 0.78rem; font-weight: 700;
+      background: #151a26; color: #94a3b8; border-radius: 4px; padding: 2px 0;
+      user-select: none; flex-shrink: 0;
+    }
+    .gutter-syllables.section-header {
+      background: transparent; color: var(--accent); font-weight: 800; font-size: 0.75rem;
+    }
+    .lyric-text-input {
+      flex: 1; background: transparent; border: none; outline: none;
+      color: #f1f5f9; font-family: inherit; font-size: inherit; line-height: inherit;
+    }
+    .lyric-text-input:focus { border-bottom: 1px solid var(--accent); }
+    .badge-rhyme {
+      font-size: 0.72rem; font-weight: 800; padding: 2px 7px; border-radius: 4px;
+      color: #fff; user-select: none; flex-shrink: 0; min-width: 28px; text-align: center;
+    }
+
+    /* 3-Way Comparison Matrix */
+    #matrixView {
+      flex: 1; display: none; grid-template-columns: repeat(3, 1fr); gap: 1px;
+      background: var(--border); overflow: hidden;
+    }
+    .matrix-column {
+      background: #090a0f; display: flex; flex-direction: column; overflow: hidden;
+    }
+    .matrix-header {
+      padding: 0.8rem 1rem; background: var(--panel); border-bottom: 1px solid var(--border);
+      display: flex; align-items: center; justify-content: space-between;
+    }
+    .matrix-content {
+      flex: 1; overflow-y: auto; padding: 1rem; font-family: 'SF Mono', Consolas, monospace;
+      font-size: 0.85rem; line-height: 1.7;
+    }
+    .matrix-line-row {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 3px 6px; border-radius: 4px; margin-bottom: 2px;
+    }
+    .matrix-line-row:hover { background: #131722; }
+    .matrix-line-text { flex: 1; margin-right: 0.6rem; }
+    .btn-pick {
+      opacity: 0; background: var(--accent); border: none; color: #fff;
+      font-size: 0.65rem; font-weight: 700; padding: 2px 6px; border-radius: 3px; cursor: pointer;
+    }
+    .matrix-line-row:hover .btn-pick { opacity: 1; }
+
+    /* Suno 4-Block Drawer Modal */
+    #sunoModal {
+      position: fixed; inset: 0; background: rgba(0,0,0,0.8);
+      display: none; align-items: center; justify-content: center; z-index: 9999;
+    }
+    .suno-box {
+      background: var(--panel); border: 1px solid var(--border); border-radius: 12px;
+      width: 90%; max-width: 780px; max-height: 85vh; display: flex; flex-direction: column;
+      box-shadow: 0 20px 40px rgba(0,0,0,0.9);
+    }
+    .suno-header {
+      padding: 1.2rem; border-bottom: 1px solid var(--border);
+      display: flex; align-items: center; justify-content: space-between;
+    }
+    .suno-content { flex: 1; overflow-y: auto; padding: 1.5rem; }
+    .block-card {
+      background: #090a0f; border: 1px solid var(--border); border-radius: 8px;
+      padding: 1rem; margin-bottom: 1.2rem; position: relative;
+    }
+    .block-title {
+      font-size: 0.75rem; font-weight: 700; text-transform: uppercase;
+      color: var(--accent); margin-bottom: 0.5rem;
+    }
+    .block-pre {
+      font-family: 'SF Mono', Consolas, monospace; font-size: 0.82rem;
+      white-space: pre-wrap; color: #cbd5e1;
+    }
+    .btn-copy-block {
+      position: absolute; top: 0.75rem; right: 0.75rem;
+      background: var(--card); border: 1px solid var(--border); color: #cbd5e1;
+      padding: 3px 8px; border-radius: 4px; font-size: 0.7rem; cursor: pointer;
+    }
+    .btn-copy-block:hover { background: var(--accent); color: #fff; }
+  </style>
+</head>
+<body>
+
+  <!-- Password Security Screen -->
+  <div id="authOverlay">
+    <div class="auth-box">
+      <div class="auth-badge">brickOS PRODUCER SUITE</div>
+      <div class="auth-title">Songwriter & Lyric Coach</div>
+      <div class="auth-subtitle">Nashville Executive SOP & Lyric Studio Matrix</div>
+      <form id="authForm" onsubmit="handleAuth(event)">
+        <input type="password" id="accessPass" class="auth-input" placeholder="Enter studio password" autofocus required />
+        <button type="submit" class="auth-btn">Unlock Studio Workbench</button>
+        <div id="authError" class="auth-error">Incorrect password. Access denied.</div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Main App Shell -->
+  <div id="appRoot">
+    <header>
+      <div class="brand-wrap">
+        <span class="brand-tag">brickOS</span>
+        <span class="brand-title">Lyric Coach Workbench</span>
+      </div>
+      <div class="header-center">
+        <button id="btnSoloMode" class="mode-tab active" onclick="setMode('solo')">Solo Editor</button>
+        <button id="btnMatrixMode" class="mode-tab" onclick="setMode('matrix')">3-Way Comparison Matrix</button>
+      </div>
+      <div class="header-actions">
+        <button class="btn-action" onclick="openSunoDrawer()">⚡ Suno 4-Block</button>
+        <button class="btn-action btn-primary" onclick="finishCurrentVersion()">★ Finish Version</button>
+        <button class="btn-action" onclick="lockStudio()">🔒 Lock</button>
+      </div>
+    </header>
+
+    <div class="workbench-body">
+      <!-- Left Sidebar: Song Brief & Audit -->
+      <aside class="sidebar">
+        <div class="sidebar-section">
+          <div class="sidebar-title">Song Brief Matrix</div>
+          <div class="form-group">
+            <label class="form-label">Song Title</label>
+            <input type="text" id="songTitle" class="form-input" value="The Stone Remembers" oninput="updateSongMeta()" />
+          </div>
+          <div class="form-group">
+            <label class="form-label">Genre & Tempo</label>
+            <div style="display:flex; gap:0.5rem;">
+              <select id="songGenre" class="form-select" onchange="updateSongMeta()">
+                <option value="Afrogospel">Afrogospel (90-105 BPM)</option>
+                <option value="Modern Worship">Modern Worship (Vulnerable I)</option>
+                <option value="CHH">CHH / Rap (Wholesome Hype)</option>
+                <option value="CEDM">CEDM (124-130 BPM)</option>
+                <option value="Roots Indie">Roots / Campfire Folk</option>
+              </select>
+              <input type="number" id="songBpm" class="form-input" style="width: 75px;" value="102" oninput="updateSongMeta()" />
+            </div>
+          </div>
+          <div class="form-group">
+            <label class="form-label">EP Mission Mandate</label>
+            <select id="epMandate" class="form-select" onchange="updateSongMeta()">
+              <option value="EP 1: Restoration">EP 1: Restoration (Refinement & Healing)</option>
+              <option value="EP 2: Conflict Suite">EP 2: Conflict Suite (Family & Truth)</option>
+              <option value="EP 3: War Room Anthems">EP 3: War Room (Spiritual Warfare)</option>
+              <option value="EP 4: Surrender Sessions">EP 4: Surrender (Identity & Rest)</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Vocal Archetype</label>
+            <select id="vocalArchetype" class="form-select" onchange="updateSongMeta()">
+              <option value="Brandon">Brandon (The Campfire Anchor / Raspy)</option>
+              <option value="PATD">PATD (The Soul Belter / High Tenor)</option>
+              <option value="Kane">Kane (Tectonic / Sub-Sonic Steel)</option>
+              <option value="Neon Gospel">Neon Gospel (Boss Energy Alto / Pop Shimmer)</option>
+              <option value="Monica">Monica (Crossover Anchor / Trap Gritty)</option>
+              <option value="Ms T">Ms T (Gospel Foundation / B3 Power)</option>
+            </select>
+          </div>
+        </div>
+
+        <!-- Live brickOS Audit -->
+        <div class="sidebar-section">
+          <div class="sidebar-title">
+            <span>Nashville Truth Audit</span>
+            <span id="auditBadge" style="font-size:0.7rem; color:var(--text-muted);">v1.9 SOP</span>
+          </div>
+          <div class="audit-card">
+            <div class="score-row">
+              <span style="font-size:0.8rem; font-weight:600;">Compliance</span>
+              <span id="auditScoreVal" class="score-value">88</span>
+            </div>
+            <div id="pillPivot" class="audit-pill pill-pass">✓ Throne Room Pivot</div>
+            <div id="pillObi" class="audit-pill pill-pass">✓ OBI Funnel to Chorus</div>
+            <div id="pillCliche" class="audit-pill pill-pass">✓ Zero Forbidden Clichés</div>
+            <div id="pillScar" class="audit-pill pill-pass">✓ 3:1 Sonic Scar Authentic</div>
+          </div>
+        </div>
+      </aside>
+
+      <!-- Main Editor / Multi-Version Area -->
+      <main class="editor-area">
+        <!-- Version Tab Bar -->
+        <div class="version-strip">
+          <div class="version-tabs">
+            <div id="vTab0" class="v-tab active" onclick="switchVersion(0)">
+              <span>Version 1 (Draft)</span>
+              <span id="vScore0" class="score-mini">88</span>
+            </div>
+            <div id="vTab1" class="v-tab" onclick="switchVersion(1)">
+              <span>Version 2 (Polished)</span>
+              <span id="vScore1" class="score-mini">--</span>
+            </div>
+            <div id="vTab2" class="v-tab" onclick="switchVersion(2)">
+              <span>Version 3 (Radio Hook)</span>
+              <span id="vScore2" class="score-mini">--</span>
+            </div>
+          </div>
+          <div style="font-size: 0.75rem; color: var(--text-muted);">
+            Auto-calculating syllables & terminal rhymes in real-time
+          </div>
+        </div>
+
+        <!-- Solo Editor -->
+        <div id="soloView">
+          <div class="editor-pane">
+            <div id="lyricLinesList" class="lyric-lines-container"></div>
+          </div>
+        </div>
+
+        <!-- 3-Way Comparison Matrix -->
+        <div id="matrixView">
+          <div class="matrix-column">
+            <div class="matrix-header">
+              <span style="font-weight:700; font-size:0.85rem; color:#60a5fa;">Version 1 (Initial Flow)</span>
+              <span id="matrixScore0" style="font-size:0.75rem; color:var(--text-muted);">Score: 88</span>
+            </div>
+            <div id="matrixCol0" class="matrix-content"></div>
+          </div>
+          <div class="matrix-column">
+            <div class="matrix-header">
+              <span style="font-weight:700; font-size:0.85rem; color:#a78bfa;">Version 2 (Refined Cadence)</span>
+              <span id="matrixScore1" style="font-size:0.75rem; color:var(--text-muted);">Score: --</span>
+            </div>
+            <div id="matrixCol1" class="matrix-content"></div>
+          </div>
+          <div class="matrix-column">
+            <div class="matrix-header">
+              <span style="font-weight:700; font-size:0.85rem; color:#34d399;">Version 3 (Final Radio Cut)</span>
+              <span id="matrixScore2" style="font-size:0.75rem; color:var(--text-muted);">Score: --</span>
+            </div>
+            <div id="matrixCol2" class="matrix-content"></div>
+          </div>
+        </div>
+      </main>
+    </div>
+  </div>
+
+  <!-- Suno 4-Block Blueprint Drawer -->
+  <div id="sunoModal">
+    <div class="suno-box">
+      <div class="suno-header">
+        <div>
+          <h3 style="font-size:1.1rem; color:#fff;" id="sunoModalTitle">Suno v5.5 4-Block Blueprint</h3>
+          <p style="font-size:0.78rem; color:var(--text-muted);">Formatted to exact Nashville Executive Producer criteria</p>
+        </div>
+        <button class="btn-action" onclick="closeSunoDrawer()">✕ Close</button>
+      </div>
+      <div class="suno-content">
+        <div class="block-card">
+          <div class="block-title">Block 1: Lyrics & Meta-Tags</div>
+          <button class="btn-copy-block" onclick="copyBlock('sunoBlock1')">Copy</button>
+          <pre id="sunoBlock1" class="block-pre"></pre>
+        </div>
+        <div class="block-card">
+          <div class="block-title">Block 2: Style & Descriptors</div>
+          <button class="btn-copy-block" onclick="copyBlock('sunoBlock2')">Copy</button>
+          <pre id="sunoBlock2" class="block-pre"></pre>
+        </div>
+        <div class="block-card">
+          <div class="block-title">Block 3: Excluded Styles (Artifact Killer)</div>
+          <button class="btn-copy-block" onclick="copyBlock('sunoBlock3')">Copy</button>
+          <pre id="sunoBlock3" class="block-pre"></pre>
+        </div>
+        <div class="block-card">
+          <div class="block-title">Block 4: Sliders</div>
+          <button class="btn-copy-block" onclick="copyBlock('sunoBlock4')">Copy</button>
+          <pre id="sunoBlock4" class="block-pre"></pre>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script type="module">
+    import { countLineSyllables, analyzeRhymeScheme } from './syllables.js';
+    import { auditLyrics } from './brickos-rules.js';
+
+    // Studio SHA-256 password hash (default: "story")
+    const DEFAULT_HASH = "81216503b1236814fc1456942c75a40a5a549db60492cb9117fe433066d92fc8";
+
+    // Song Project State with 3 Versions
+    const project = {
+      meta: {
+        title: "The Stone Remembers",
+        genre: "Afrogospel",
+        bpm: 102,
+        epMandate: "EP 1: Restoration",
+        vocalArchetype: "Brandon"
+      },
+      activeVersion: 0,
+      versions: [
+        {
+          id: "v1",
+          label: "Version 1",
+          score: 88,
+          text: `[Verse 1]\nStreetlights humming in the cold night air\nPacking boxes on the porch right there\nTwenty years of memories in the dust\nLearning who my aching hands can trust\n\n[Chorus]\nAnd the stone remembers what the builder threw away\nOluwa turning midnight into morning day\nEvery heavy burden that we lay down on the floor\nGrace is standing waiting at the open door\n\n[Bridge]\nNo more looking backward at the pain we left behind\nChrist is on the throne and He has renewed my mind\nSovereign King forever holy is Your name`
+        },
+        {
+          id: "v2",
+          label: "Version 2",
+          score: null,
+          text: `[Verse 1]\nStreetlights buzzing in the midnight frost\nCounting everything we thought was lost\nEmpty kitchen table, quiet room\nWaiting for the morning sun to bloom\n\n[Chorus]\nAnd the stone remembers what the builder tossed aside\nOluwa walking with us with nowhere left to hide\nEvery heavy burden that we lay down on the floor\nGrace is standing waiting at the open door\n\n[Bridge]\nLift my eyes up to the throne above\nAnchored in Your sovereign healing love\nHoly Father hold me till the morning breaks`
+        },
+        {
+          id: "v3",
+          label: "Version 3",
+          score: null,
+          text: `[Chorus]\nAnd the stone remembers what the builder threw away\nOluwa turning midnight into morning day\nEvery heavy burden that we lay down on the floor\nGrace is standing waiting at the open door\n\n[Verse 1]\nCold night air on a gravel drive\nJust so grateful that we are alive\nPacked up the truck before the sun came out\nLeaving behind the fear and doubt\n\n[Bridge]\nJesus Sovereign Creator on the throne\nYou have never left us on our own`
+        }
+      ]
+    };
+
+    // Password Hashing
+    async function sha256(message) {
+      const msgBuffer = new TextEncoder().encode(message);
+      const hashBuffer = await crypto.subtle.digest('SHA-256', msgBuffer);
+      return Array.from(new Uint8Array(hashBuffer)).map(b => b.toString(16).padStart(2, '0')).join('');
+    }
+
+    window.handleAuth = async function(e) {
+      if (e) e.preventDefault();
+      const input = document.getElementById('accessPass').value;
+      const hash = await sha256(input);
+      if (hash === DEFAULT_HASH) {
+        sessionStorage.setItem('song_coach_authed', 'true');
+        document.getElementById('authOverlay').style.display = 'none';
+        initWorkbench();
+      } else {
+        document.getElementById('authError').style.display = 'block';
+      }
+    };
+
+    window.lockStudio = function() {
+      sessionStorage.removeItem('song_coach_authed');
+      document.getElementById('authOverlay').style.display = 'flex';
+      document.getElementById('accessPass').value = '';
+    };
+
+    // Mode Switching: Solo vs 3-Way Matrix
+    window.setMode = function(mode) {
+      const solo = document.getElementById('soloView');
+      const matrix = document.getElementById('matrixView');
+      const btnSolo = document.getElementById('btnSoloMode');
+      const btnMatrix = document.getElementById('btnMatrixMode');
+
+      if (mode === 'solo') {
+        solo.style.display = 'flex';
+        matrix.style.display = 'none';
+        btnSolo.classList.add('active');
+        btnMatrix.classList.remove('active');
+        renderSoloEditor();
+      } else {
+        solo.style.display = 'none';
+        matrix.style.display = 'grid';
+        btnSolo.classList.remove('active');
+        btnMatrix.classList.add('active');
+        renderMatrixView();
+      }
+    };
+
+    // Version Switching
+    window.switchVersion = function(idx) {
+      saveActiveVersionText();
+      project.activeVersion = idx;
+      for (let i = 0; i < 3; i++) {
+        document.getElementById(`vTab${i}`).classList.toggle('active', i === idx);
+      }
+      renderSoloEditor();
+      runLiveAudit();
+    };
+
+    // Save text from DOM to model
+    function saveActiveVersionText() {
+      const inputs = document.querySelectorAll('.lyric-text-input');
+      if (inputs.length > 0) {
+        const lines = Array.from(inputs).map(inp => inp.value);
+        project.versions[project.activeVersion].text = lines.join('\n');
+      }
+    }
+
+    // Render Solo Editor with Syllable & Rhyme Scheme Gutters
+    function renderSoloEditor() {
+      const container = document.getElementById('lyricLinesList');
+      container.innerHTML = '';
+      const text = project.versions[project.activeVersion].text;
+      const lines = text.split('\n');
+      const rhymeBadges = analyzeRhymeScheme(lines);
+
+      lines.forEach((line, index) => {
+        const row = document.createElement('div');
+        row.className = 'lyric-row';
+
+        const isHeader = line.trim().startsWith('[') && line.trim().endsWith(']');
+        const sylCount = isHeader ? 'SEC' : countLineSyllables(line);
+
+        // Syllable Gutter
+        const sylBadge = document.createElement('div');
+        sylBadge.className = `gutter-syllables ${isHeader ? 'section-header' : ''}`;
+        sylBadge.textContent = sylCount !== null ? (isHeader ? '§' : sylCount) : '·';
+
+        // Input Line
+        const input = document.createElement('input');
+        input.type = 'text';
+        input.className = 'lyric-text-input';
+        input.value = line;
+        if (isHeader) {
+          input.style.fontWeight = '700';
+          input.style.color = 'var(--accent)';
+        }
+
+        input.addEventListener('input', () => {
+          saveActiveVersionText();
+          updateLineAnalysis(row, input.value, index);
+          runLiveAudit();
+        });
+
+        input.addEventListener('keydown', (e) => {
+          if (e.key === 'Enter') {
+            e.preventDefault();
+            insertNewLineAt(index + 1);
+          } else if (e.key === 'Backspace' && input.value === '' && lines.length > 1) {
+            e.preventDefault();
+            removeLineAt(index);
+          }
+        });
+
+        // Rhyme Badge
+        const rhymeBadge = document.createElement('div');
+        const rMatch = rhymeBadges[index];
+        if (rMatch) {
+          rhymeBadge.className = 'badge-rhyme';
+          rhymeBadge.style.backgroundColor = rMatch.color;
+          rhymeBadge.textContent = rMatch.letter;
+        } else {
+          rhymeBadge.style.width = '28px';
+        }
+
+        row.appendChild(sylBadge);
+        row.appendChild(input);
+        row.appendChild(rhymeBadge);
+        container.appendChild(row);
+      });
+    }
+
+    function insertNewLineAt(idx) {
+      saveActiveVersionText();
+      const lines = project.versions[project.activeVersion].text.split('\n');
+      lines.splice(idx, 0, '');
+      project.versions[project.activeVersion].text = lines.join('\n');
+      renderSoloEditor();
+      const inputs = document.querySelectorAll('.lyric-text-input');
+      if (inputs[idx]) inputs[idx].focus();
+    }
+
+    function removeLineAt(idx) {
+      saveActiveVersionText();
+      const lines = project.versions[project.activeVersion].text.split('\n');
+      lines.splice(idx, 1);
+      project.versions[project.activeVersion].text = lines.join('\n');
+      renderSoloEditor();
+      const inputs = document.querySelectorAll('.lyric-text-input');
+      const target = Math.max(0, idx - 1);
+      if (inputs[target]) inputs[target].focus();
+    }
+
+    function updateLineAnalysis(row, text, index) {
+      const isHeader = text.trim().startsWith('[') && text.trim().endsWith(']');
+      const sylCount = isHeader ? '§' : countLineSyllables(text);
+      row.children[0].textContent = sylCount !== null ? sylCount : '·';
+    }
+
+    // "Finish Version" Workflow (Freezes & moves to next version)
+    window.finishCurrentVersion = function() {
+      saveActiveVersionText();
+      const current = project.activeVersion;
+      const next = (current + 1) % 3;
+
+      // Run final audit for this version
+      const audit = auditLyrics(project.versions[current].text, project.meta);
+      project.versions[current].score = audit.auditScore;
+      document.getElementById(`vScore${current}`).textContent = audit.auditScore;
+
+      // If next version is empty, clone current into it as starting point
+      if (!project.versions[next].text || project.versions[next].text.trim().length === 0) {
+        project.versions[next].text = project.versions[current].text;
+      }
+
+      alert(`Version ${current + 1} finalized! Compliance Score: ${audit.auditScore}/100. Moving to Version ${next + 1}.`);
+      switchVersion(next);
+      setMode('matrix'); // Show 3-way comparison matrix immediately
+    };
+
+    // Render 3-Way Comparison Matrix
+    function renderMatrixView() {
+      saveActiveVersionText();
+      for (let i = 0; i < 3; i++) {
+        const col = document.getElementById(`matrixCol${i}`);
+        const scoreSpan = document.getElementById(`matrixScore${i}`);
+        col.innerHTML = '';
+
+        const ver = project.versions[i];
+        const audit = auditLyrics(ver.text, project.meta);
+        scoreSpan.textContent = `Score: ${audit.auditScore}/100`;
+
+        const lines = (ver.text || '').split('\n');
+        lines.forEach(l => {
+          const row = document.createElement('div');
+          row.className = 'matrix-line-row';
+
+          const span = document.createElement('span');
+          span.className = 'matrix-line-text';
+          span.textContent = l || ' ';
+          if (l.trim().startsWith('[')) {
+            span.style.color = 'var(--accent)';
+            span.style.fontWeight = '700';
+          }
+
+          const btn = document.createElement('button');
+          btn.className = 'btn-pick';
+          btn.textContent = 'Copy';
+          btn.onclick = () => {
+            navigator.clipboard.writeText(l);
+            btn.textContent = '✓';
+            setTimeout(() => btn.textContent = 'Copy', 1500);
+          };
+
+          row.appendChild(span);
+          if (!l.trim().startsWith('[')) row.appendChild(btn);
+          col.appendChild(row);
+        });
+      }
+    }
+
+    // Run brickOS live audit
+    function runLiveAudit() {
+      const text = project.versions[project.activeVersion].text;
+      const res = auditLyrics(text, project.meta);
+
+      document.getElementById('auditScoreVal').textContent = res.auditScore;
+      document.getElementById(`vScore${project.activeVersion}`).textContent = res.auditScore;
+
+      const pPivot = document.getElementById('pillPivot');
+      pPivot.className = `audit-pill ${res.pivotDetected ? 'pill-pass' : 'pill-warn'}`;
+      pPivot.textContent = res.pivotDetected ? '✓ Throne Room Pivot Verified' : '⚠ Missing Vertical Pivot in Bridge';
+
+      const pObi = document.getElementById('pillObi');
+      pObi.className = `audit-pill ${res.obiFunnelPassed ? 'pill-pass' : 'pill-warn'}`;
+      pObi.textContent = res.obiFunnelPassed ? '✓ OBI Funnel to Chorus' : '⚠ Chorus Lacks 4-Line Payoff';
+
+      const pCliche = document.getElementById('pillCliche');
+      if (res.detectedCliches.length === 0) {
+        pCliche.className = 'audit-pill pill-pass';
+        pCliche.textContent = '✓ Zero Forbidden Clichés';
+      } else {
+        pCliche.className = 'audit-pill pill-warn';
+        pCliche.textContent = `⚠ Cliché Detected: "${res.detectedCliches[0]}"`;
+      }
+    }
+
+    // Suno 4-Block Modal
+    window.openSunoDrawer = function() {
+      saveActiveVersionText();
+      const ver = project.versions[project.activeVersion];
+      const res = auditLyrics(ver.text, project.meta);
+
+      document.getElementById('sunoModalTitle').textContent = `Suno v5.5 4-Block (${res.sunoBlocks.bmvTitle})`;
+      document.getElementById('sunoBlock1').textContent = res.sunoBlocks.block1;
+      document.getElementById('sunoBlock2').textContent = res.sunoBlocks.block2;
+      document.getElementById('sunoBlock3').textContent = res.sunoBlocks.block3;
+      document.getElementById('sunoBlock4').textContent = res.sunoBlocks.block4;
+      document.getElementById('sunoModal').style.display = 'flex';
+    };
+
+    window.closeSunoDrawer = function() {
+      document.getElementById('sunoModal').style.display = 'none';
+    };
+
+    window.copyBlock = function(id) {
+      const text = document.getElementById(id).textContent;
+      navigator.clipboard.writeText(text);
+      alert('Block copied to clipboard!');
+    };
+
+    window.updateSongMeta = function() {
+      project.meta.title = document.getElementById('songTitle').value;
+      project.meta.genre = document.getElementById('songGenre').value;
+      project.meta.bpm = document.getElementById('songBpm').value;
+      project.meta.epMandate = document.getElementById('epMandate').value;
+      project.meta.vocalArchetype = document.getElementById('vocalArchetype').value;
+      runLiveAudit();
+    };
+
+    function initWorkbench() {
+      renderSoloEditor();
+      runLiveAudit();
+    }
+
+    window.addEventListener('DOMContentLoaded', () => {
+      if (sessionStorage.getItem('song_coach_authed') === 'true') {
+        document.getElementById('authOverlay').style.display = 'none';
+        initWorkbench();
+      }
+    });
+  </script>
+</body>
+</html>
