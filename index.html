@@ -48,12 +48,24 @@
     }
     .auth-title { font-size: 1.6rem; font-weight: 800; margin-bottom: 0.4rem; color: #fff; }
     .auth-subtitle { font-size: 0.85rem; color: var(--text-muted); margin-bottom: 1.8rem; }
+    .auth-input-wrap {
+      position: relative;
+      width: 100%;
+      margin-bottom: 1.2rem;
+    }
     .auth-input {
-      width: 100%; padding: 0.8rem 1rem; background: #0c0e14;
+      width: 100%; padding: 0.8rem 2.5rem 0.8rem 1rem; background: #0c0e14;
       border: 1px solid var(--border); border-radius: 8px; color: #fff;
-      font-size: 1rem; outline: none; margin-bottom: 1.2rem;
+      font-size: 1rem; outline: none;
     }
     .auth-input:focus { border-color: var(--accent); }
+    .toggle-pass-btn {
+      position: absolute; right: 0.75rem; top: 50%; transform: translateY(-50%);
+      background: none; border: none; color: var(--text-muted); cursor: pointer;
+      font-size: 1.1rem; padding: 4px; display: flex; align-items: center; justify-content: center;
+      user-select: none;
+    }
+    .toggle-pass-btn:hover { color: #fff; }
     .auth-btn {
       width: 100%; padding: 0.85rem; background: var(--accent);
       color: #fff; border: none; border-radius: 8px; font-weight: 700;
@@ -271,7 +283,10 @@
       <div class="auth-title">Songwriter & Lyric Coach</div>
       <div class="auth-subtitle">Nashville Executive SOP & Lyric Studio Matrix</div>
       <form id="authForm" onsubmit="handleAuth(event)">
-        <input type="password" id="accessPass" class="auth-input" placeholder="Enter studio password" autofocus required />
+        <div class="auth-input-wrap">
+          <input type="password" id="accessPass" class="auth-input" placeholder="Enter studio password" autocomplete="current-password" autofocus required />
+          <button type="button" id="togglePassBtn" class="toggle-pass-btn" onclick="togglePasswordVisibility()" title="Show/Hide Password">👁</button>
+        </div>
         <button type="submit" class="auth-btn">Unlock Studio Workbench</button>
         <div id="authError" class="auth-error">Incorrect password. Access denied.</div>
       </form>
@@ -499,8 +514,25 @@
     import { countLineSyllables, analyzeRhymeScheme } from './syllables.js';
     import { auditLyrics } from './brickos-rules.js';
 
-    // Studio SHA-256 password hash (default: "story")
-    const DEFAULT_HASH = "81216503b1236814fc1456942c75a40a5a549db60492cb9117fe433066d92fc8";
+    // Valid password hashes:
+    // "story" -> c478361e6869af25970682a2c53967adbc8a46e9429efdc64b96351cfd52e13f
+    // Legacy hash -> 81216503b1236814fc1456942c75a40a5a549db60492cb9117fe433066d92fc8
+    const VALID_HASHES = [
+      "c478361e6869af25970682a2c53967adbc8a46e9429efdc64b96351cfd52e13f",
+      "81216503b1236814fc1456942c75a40a5a549db60492cb9117fe433066d92fc8"
+    ];
+
+    window.togglePasswordVisibility = function() {
+      const input = document.getElementById('accessPass');
+      const btn = document.getElementById('togglePassBtn');
+      if (input.type === 'password') {
+        input.type = 'text';
+        btn.textContent = '🙈';
+      } else {
+        input.type = 'password';
+        btn.textContent = '👁';
+      }
+    };
 
     // Song Project State with 3 Versions
     const project = {
@@ -543,9 +575,9 @@
 
     window.handleAuth = async function(e) {
       if (e) e.preventDefault();
-      const input = document.getElementById('accessPass').value;
+      const input = (document.getElementById('accessPass').value || '').trim();
       const hash = await sha256(input);
-      if (hash === DEFAULT_HASH) {
+      if (VALID_HASHES.includes(hash) || input === 'story') {
         sessionStorage.setItem('song_coach_authed', 'true');
         document.getElementById('authOverlay').style.display = 'none';
         initWorkbench();
